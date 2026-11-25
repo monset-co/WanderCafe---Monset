@@ -49,12 +49,14 @@ function Nav({ path }) {
   return (
     <header className="vt-header fixed inset-x-0 top-0 z-40 border-b border-espresso/10 bg-cream/85 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-8">
-        <Link to="/" aria-label="Wander, home" className="h-10 text-teal-deep">
+        <Link to="/" aria-label="Wander, home" className="h-8 shrink-0 text-teal-deep sm:h-10">
           <Wordmark tagline={false} className="h-full text-base" />
         </Link>
-        <div className="flex items-center gap-6 text-sm font-semibold">
-          <Link to="/order" className={navLink}>
-            Menu &amp; order
+        <div className="flex items-center gap-3 text-sm font-semibold sm:gap-6">
+          {/* on phones the menu link stays (it carries the cart count); only /stay drops it for its "Order ahead" button */}
+          <Link to="/order" className={`whitespace-nowrap transition-colors duration-150 hover:text-teal aria-[current=page]:text-teal ${path === "/stay" ? "hidden sm:block" : ""}`}>
+            <span className="sm:hidden">Menu</span>
+            <span className="hidden sm:inline">Menu &amp; order</span>
             {count > 0 && (
               <span className="ml-1.5 inline-grid min-w-5 place-items-center rounded-full bg-tiffany px-1.5 text-xs text-espresso tabular-nums">
                 {count}
@@ -63,11 +65,11 @@ function Nav({ path }) {
           </Link>
           <Link to="/stay" className={navLink}>Stay</Link>
           {path === "/stay" ? (
-            <Link to="/order" className="rounded-full bg-teal-deep px-4 py-2 text-cream transition-transform duration-150 active:scale-[0.97]">
+            <Link to="/order" className="rounded-full bg-teal-deep px-3 py-2 whitespace-nowrap sm:px-4 text-cream transition-transform duration-150 active:scale-[0.97]">
               Order ahead
             </Link>
           ) : (
-            <Link to="/stay" className="rounded-full bg-teal-deep px-4 py-2 text-cream transition-transform duration-150 active:scale-[0.97]">
+            <Link to="/stay" className="rounded-full bg-teal-deep px-3 py-2 whitespace-nowrap max-[374px]:hidden sm:px-4 text-cream transition-transform duration-150 active:scale-[0.97]">
               Book a stay
             </Link>
           )}

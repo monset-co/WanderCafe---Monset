@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ROOMS, DEPOSIT_RATE } from "../data/rooms";
 import { addDays, checkBooking, nightsBetween, peso, quote, todayPH } from "../lib/booking";
-import PayButton, { field, label, startCheckout } from "./PayButton";
+import PayButton, { field, label, startCheckout, useSending } from "./PayButton";
 
 const CLASH = "Those dates overlap a booking for this room. Please pick other dates.";
 const day = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" });
@@ -20,7 +20,7 @@ export default function BookingForm() {
     phone: "",
   });
   const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] = useSending();
 
   // nights already taken (from the database), to warn before the guest reaches payment.
   // The server re-checks; this is only an early heads-up.

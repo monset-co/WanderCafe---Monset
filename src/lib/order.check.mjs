@@ -1,6 +1,6 @@
 // Run with `npm run check`. Fails loudly if order pricing or validation breaks.
 import assert from "node:assert/strict";
-import { checkOrder, describeLine, fmtTime, timeSlots } from "./order.js";
+import { checkOrder, describeLine, fmtTime, liveSlot, timeSlots } from "./order.js";
 
 // 9:00 AM in Manila
 const now = Date.parse("2026-11-02T01:00:00Z");
@@ -31,10 +31,24 @@ const r = checkOrder(ok, now);
 assert.equal(r.total, (140 * 2 + 130) * 100);
 assert.equal(r.order.date, "2026-11-02");
 assert.match(checkOrder({ ...ok, lines: [] }, now).error, /empty/);
-assert.match(checkOrder({ ...ok, time: "09:15" }, now).error, /time/);
+assert.match(checkOrder({ ...ok, time: "09:00" }, now).error, /time/);
 assert.match(checkOrder({ ...ok, lines: [{ itemId: "ramen", choices: ["Spicy", "No cheese"], qty: 0 }] }, now).error, /Up to/);
 assert.match(checkOrder({ ...ok, lines: [{ itemId: "ramen", choices: [], qty: 1 }] }, now).error, /menu/);
 assert.match(checkOrder({ ...ok, mode: "delivery" }, now).error, /pickup/);
 // a price sent by the browser is ignored; the menu price is charged
 assert.equal(checkOrder({ ...ok, lines: [{ itemId: "coffee-latte", choices: [], price: 1, qty: 1 }] }, now).total, 13000);
+// the earliest slot picked 5 min ago is still accepted (grace), one from 30 min ago is not
+assert.equal(checkOrder({ ...ok, time: "09:30" }, now + 5 * 60e3).error, undefined);
+assert.match(checkOrder({ ...ok, time: "09:30" }, now + 30 * 60e3).error, /time/);
+// stale picks roll forward: past slot -> next one; after closing -> same time tomorrow
+assert.deepEqual([liveSlot(0, "09:30", now).time, liveSlot(0, "07:00", now).time], ["09:30", "09:30"]);
+const late = Date.parse("2026-11-02T13:00:00Z"); // 9 PM Manila
+assert.deepEqual([liveSlot(0, "19:45", late).day, liveSlot(0, "19:45", late).time], [1, "19:45"]);
+// one plate item with a required ulam pick
+assert.equal(describeLine({ itemId: "filipino-plate", choices: ["Tocino"] }).label, "Filipino Comfort Plate (Tocino)");
+// Crispy Pata needs 45 min: 9:30 is too soon for it, 9:45 is fine (9:00 + 45)
+const pata = { ...ok, lines: [{ itemId: "crispy-pata", choices: ["Group meal, good for 3 to 4"], qty: 1 }] };
+assert.match(checkOrder({ ...pata, time: "09:30" }, now).error, /time/);
+assert.equal(checkOrder({ ...pata, time: "09:45" }, now).total, 79900);
+assert.equal(liveSlot(0, "09:30", now, 45).time, "09:45");
 console.log("order checks passed");

@@ -29,6 +29,11 @@ export function describeLine({ itemId, choices = [] }) {
   return { item, unit, label: shown.length ? `${item.name} (${shown.join(", ")})` : item.name };
 }
 
+// Kitchen time the order needs: the usual lead, or longer if something is cooked to order (Crispy Pata).
+// Takes cart lines ({ itemId }) or described lines ({ item }).
+export const leadFor = (lines) =>
+  Math.max(HOURS.leadMinutes, ...lines.map((l) => (l.item ?? ITEMS.get(l.itemId))?.leadMinutes ?? 0));
+
 // minutes past midnight in Manila
 const minutesPH = (now) => {
   const d = new Date(now + 8 * 36e5);
@@ -39,13 +44,25 @@ const toHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m
 
 // Pickup / dine-in times for today (day 0) or tomorrow (day 1), every 15 min while open,
 // at least `leadMinutes` from now so the kitchen has time.
-export function timeSlots(day, now = Date.now()) {
-  const earliest = day === 0 ? minutesPH(now) + HOURS.leadMinutes : 0;
+export function timeSlots(day, now = Date.now(), lead = HOURS.leadMinutes) {
+  const earliest = day === 0 ? minutesPH(now) + lead : 0;
   const out = [];
   for (let m = toMin(HOURS.open); m <= toMin(HOURS.close) - HOURS.stepMinutes; m += HOURS.stepMinutes)
     if (m >= earliest) out.push(toHHMM(m));
   return out;
 }
+
+// The day/time to actually use: the guest's pick while it's still offered, else the next open slot
+// (tomorrow once today's last slot has passed). Keeps a cart left open for a while from going stale.
+export function liveSlot(day, time, now = Date.now(), lead = HOURS.leadMinutes) {
+  if (day === 0 && !timeSlots(0, now, lead).length) day = 1;
+  const slots = timeSlots(day, now, lead);
+  return { day, time: slots.includes(time) ? time : slots[0], slots };
+}
+
+// a slot picked while filling in the form stays valid this much longer, so a guest who picked
+// the earliest time isn't bounced for typing slowly (the kitchen still gets lead - grace minutes)
+const GRACE_MS = 10 * 60e3;
 
 export const fmtTime = (hhmm) => {
   const m = toMin(hhmm);
@@ -69,7 +86,7 @@ export function checkOrder(input, now = Date.now()) {
 
   if (o.mode !== "pickup" && o.mode !== "dine-in") return { error: "Choose pickup or dine-in." };
   if (o.day !== 0 && o.day !== 1) return { error: "Choose today or tomorrow." };
-  if (!timeSlots(o.day, now).includes(o.time)) return { error: "That time isn't available anymore. Please pick another." };
+  if (!timeSlots(o.day, now - GRACE_MS, leadFor(lines)).includes(o.time)) return { error: "That time isn't available anymore. Please pick another." };
 
   const name = String(o.name ?? "").trim();
   const email = String(o.email ?? "").trim();

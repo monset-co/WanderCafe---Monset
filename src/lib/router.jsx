@@ -32,6 +32,7 @@ export function navigate(to) {
     return;
   }
   transition(() => {
+    current = url.pathname;
     history.pushState(null, "", url);
     emit();
     const target = url.hash && document.querySelector(url.hash);
@@ -40,7 +41,13 @@ export function navigate(to) {
   });
 }
 
-addEventListener("popstate", () => transition(emit));
+// Back/Forward between pages animates; a hash-only step (same page, e.g. #rooms) doesn't fly the plane
+let current = location.pathname;
+addEventListener("popstate", () => {
+  if (location.pathname === current) return;
+  current = location.pathname;
+  transition(emit);
+});
 
 // <a> that navigates in-app; modified clicks (new tab etc.) still behave like normal links
 export function Link({ to, onClick, ...props }) {

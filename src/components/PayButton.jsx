@@ -1,4 +1,17 @@
+import { useEffect, useState } from "react";
 import { Plane } from "./Logo";
+
+// useState(false) for "on our way to PayMongo", reset when the guest comes back with the browser's
+// Back button: the page is restored from the back-forward cache with the button still disabled.
+export function useSending() {
+  const [sending, setSending] = useState(false);
+  useEffect(() => {
+    const reset = (e) => e.persisted && setSending(false);
+    addEventListener("pageshow", reset);
+    return () => removeEventListener("pageshow", reset);
+  }, []);
+  return [sending, setSending];
+}
 
 // Full-width pay button; its paper plane takes off while we open PayMongo.
 export default function PayButton({ sending, children }) {

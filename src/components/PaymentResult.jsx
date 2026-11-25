@@ -62,11 +62,11 @@ export default function PaymentResult() {
       {open && (
         <motion.div
           role="status"
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: -24 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 12, transition: { duration: 0.2 } }}
+          exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
           transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-start gap-4 rounded-3xl bg-cream p-5 text-espresso shadow-2xl ring-1 ring-espresso/10"
+          className="fixed inset-x-4 top-20 z-40 mx-auto flex max-w-md items-start gap-4 rounded-3xl bg-cream p-5 text-espresso shadow-2xl ring-1 ring-espresso/10"
         >
           <Mark className={`size-14 shrink-0 text-teal ${shown === "confirming" ? "animate-pulse" : ""}`} />
           <div className="flex-1">
