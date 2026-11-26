@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wandercafe-monset",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-19",
+  // node:crypto (PayMongo webhook signature, order refs), Buffer and process.env in the api/ handlers
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Variables live in Cloudflare › Settings › Variables and Secrets (see worker/index.js): keep them on every
+  // deploy instead of replacing them with this file's (none). Secrets never go in this file.
+  "keep_vars": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // any path serves index.html (the site is one page for now)
+    "not_found_handling": "single-page-application",
+    // /api/* must reach the worker instead of falling back to index.html
+    "run_worker_first": ["/api/*"]
+  }
+}

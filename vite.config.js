@@ -3,9 +3,9 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// Runs the Vercel functions in api/ under `npm run dev`, so checkout works locally without the Vercel CLI.
+// Runs the api/ handlers under `npm run dev` (production runs them in the Cloudflare Worker, worker/index.js).
 // Handlers are Web-standard (`export async function GET/POST(request)` returning a Response), the same
-// shape Vercel runs, so this just turns Node's req into a Request and the Response back.
+// shape the Worker calls, so this just turns Node's req into a Request and the Response back.
 const devApi = {
   name: "dev-api",
   configureServer(server) {

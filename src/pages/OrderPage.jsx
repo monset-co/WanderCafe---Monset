@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { AddButton, CartDrawer, CartPill, ItemPicker } from "../components/Cart";
-import { DRINKS, FOOD, HOURS } from "../data/menu";
-import { useCart } from "../lib/cart";
-import { fmtTime } from "../lib/order";
+import { DRINKS, FOOD } from "../data/menu";
+import { pruneCart, useCart } from "../lib/cart";
+import { itemLine, setLiveMenu } from "../lib/order";
 
 const CATEGORIES = [...FOOD, ...DRINKS];
+const isDrink = (c) => DRINKS.some((d) => d.id === c.id);
 
 const STEPS = ["Pick from the menu", "Pay online", "Pick up or dine in"];
 
@@ -12,7 +13,21 @@ const STEPS = ["Pick from the menu", "Pay online", "Pick up or dine in"];
 export default function OrderPage() {
   const [picking, setPicking] = useState(null); // item whose details/options are open
   const [cartOpen, setCartOpen] = useState(false);
-  const active = useActiveSection();
+  // today's prices and sold-out items from the dashboard's Inventory; menu.js prices show until then
+  const [, setMenuLoaded] = useState(false);
+  useEffect(() => {
+    fetch("/api/menu")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((rows) => {
+        setLiveMenu(rows);
+        pruneCart();
+        setMenuLoaded(true);
+      })
+      .catch(() => {}); // checkout re-prices on the server anyway
+  }, []);
+  // what can be ordered right now, by category; empty categories drop out
+  const shown = CATEGORIES.map((c) => ({ ...c, items: c.items.filter(itemLine) })).filter((c) => c.items.length);
+  const active = useActiveSection(shown.map((c) => c.id).join(" "));
 
   // how many of each item are already in the cart, for the "2 in order" badges
   const inCart = {};
@@ -35,21 +50,22 @@ export default function OrderPage() {
             ))}
           </ol>
           <p className="mt-3 text-sm text-espresso/70">
-            Open {fmtTime(HOURS.open)} to {fmtTime(HOURS.close)}, today or tomorrow · GCash, Maya, card or QR Ph
+            Order for today or tomorrow · Pay with GCash, Maya, card or QR Ph
           </p>
         </div>
       </section>
 
-      <CategoryBar active={active} />
+      <CategoryBar categories={shown} active={active} />
 
       <div className="mx-auto max-w-6xl space-y-14 px-4 pt-10 pb-32 sm:px-8">
-        {CATEGORIES.map((c) => (
+        {!shown.length && <p className="text-espresso/70">The kitchen has nothing on the online menu right now. Please check back soon.</p>}
+        {shown.map((c) => (
           <section key={c.id} id={c.id} aria-labelledby={`h-${c.id}`} className="scroll-mt-32">
             <h2 id={`h-${c.id}`} className="font-display text-[clamp(1.6rem,3vw,2.2rem)] leading-tight font-semibold">
               <span className="brush">{c.name}</span>
             </h2>
             {c.note && <p className="mt-2 text-espresso/70">{c.note}</p>}
-            <ul className={`mt-6 grid gap-3 ${c.items.length > 1 ? "md:grid-cols-2" : "md:max-w-[calc(50%-0.375rem)]"} ${DRINKS.includes(c) ? "lg:grid-cols-3" : ""}`}>
+            <ul className={`mt-6 grid gap-3 ${c.items.length > 1 ? "md:grid-cols-2" : "md:max-w-[calc(50%-0.375rem)]"} ${isDrink(c) ? "lg:grid-cols-3" : ""}`}>
               {c.items.map((it) => (
                 <li key={it.id}>
                   <ItemCard item={it} count={inCart[it.id]} onPick={setPicking} />
@@ -79,7 +95,7 @@ function ItemCard({ item, count, onPick }) {
         </h3>
         {item.desc && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-espresso/70">{item.desc}</p>}
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
-          <span className="font-bold text-teal-deep tabular-nums">₱{item.price}</span>
+          <span className="font-bold text-teal-deep tabular-nums">₱{itemLine(item).unit}</span>
           {item.options && <span className="text-xs text-espresso/60">Options available</span>}
           {count > 0 && <span className="rounded-full bg-tiffany/60 px-2 py-0.5 text-xs font-bold text-espresso">{count} in order</span>}
         </div>
@@ -98,7 +114,7 @@ function ItemCard({ item, count, onPick }) {
 
 // Sticky chips for every category; the one you're reading is filled in and kept in view.
 // Chip taps replace the URL hash instead of pushing history, so Back leaves the page, not the section.
-function CategoryBar({ active }) {
+function CategoryBar({ categories, active }) {
   const bar = useRef(null);
   useEffect(() => {
     const chip = bar.current?.querySelector(`[href="#${active}"]`);
@@ -108,7 +124,7 @@ function CategoryBar({ active }) {
   return (
     <nav aria-label="Menu categories" className="sticky top-16 z-30 mt-8 border-y border-espresso/10 bg-cream/90 backdrop-blur">
       <div ref={bar} className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:px-8">
-        {CATEGORIES.map((c, i) => (
+        {categories.map((c, i) => (
           <a
             key={c.id}
             href={`#${c.id}`}
@@ -118,7 +134,7 @@ function CategoryBar({ active }) {
               document.getElementById(c.id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
               history.replaceState(null, "", `#${c.id}`);
             }}
-            className={`shrink-0 rounded-full border border-teal-deep/30 px-4 py-1.5 text-sm font-semibold whitespace-nowrap text-teal-deep transition-colors duration-150 hover:bg-tiffany/40 aria-[current]:border-teal-deep aria-[current]:bg-teal-deep aria-[current]:text-cream ${i === FOOD.length ? "ml-3" : ""}`}
+            className={`shrink-0 rounded-full border border-teal-deep/30 px-4 py-1.5 text-sm font-semibold whitespace-nowrap text-teal-deep transition-colors duration-150 hover:bg-tiffany/40 aria-[current]:border-teal-deep aria-[current]:bg-teal-deep aria-[current]:text-cream ${i > 0 && isDrink(c) && !isDrink(categories[i - 1]) ? "ml-3" : ""}`}
           >
             {c.short}
           </a>
@@ -129,8 +145,9 @@ function CategoryBar({ active }) {
 }
 
 // id of the category section currently under the sticky bar
-function useActiveSection() {
-  const [active, setActive] = useState(CATEGORIES[0].id);
+// ids: the shown sections' ids, space-separated (a string, so the effect re-runs only when the list changes)
+function useActiveSection(ids) {
+  const [active, setActive] = useState(ids.split(" ")[0]);
   useEffect(() => {
     const io = new IntersectionObserver(
       (entries) => {
@@ -139,8 +156,11 @@ function useActiveSection() {
       },
       { rootMargin: "-130px 0px -65% 0px" } // a band just below the header + chip bar
     );
-    CATEGORIES.forEach((c) => io.observe(document.getElementById(c.id)));
+    for (const id of ids.split(" ")) {
+      const el = id && document.getElementById(id);
+      if (el) io.observe(el);
+    }
     return () => io.disconnect();
-  }, []);
+  }, [ids]);
   return active;
 }

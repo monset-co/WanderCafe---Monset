@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { addToCart, cartSummary, setQty, useCart } from "../lib/cart";
 import { peso } from "../lib/booking";
-import { checkOrder, defaultChoices, describeLine, fmtTime, leadFor, liveSlot, MAX_QTY, timeSlots } from "../lib/order";
+import { checkOrder, choiceOn, choicePrice, defaultChoices, describeLine, fmtTime, itemLine, leadFor, liveSlot, MAX_QTY, timeSlots } from "../lib/order";
 import { HOURS } from "../data/menu";
 import PayButton, { field, label, startCheckout, useSending } from "./PayButton";
 import { Plane } from "./Logo";
@@ -68,29 +68,35 @@ export function ItemPicker({ item, onClose }) {
           <div className="p-6 sm:p-7">
             <div className="flex items-start justify-between gap-4 pr-8">
               <h2 className="font-display text-2xl leading-tight font-semibold">{item.name}</h2>
-              <span className="font-display text-xl font-semibold text-teal-deep tabular-nums">₱{item.price}</span>
+              <span className="font-display text-xl font-semibold text-teal-deep tabular-nums">₱{itemLine(item)?.unit}</span>
             </div>
             {item.desc && <p className="mt-2 text-sm leading-relaxed text-espresso/75">{item.desc}</p>}
             {groups.map((g, gi) => (
               <fieldset key={g.name} className="mt-5">
                 <legend className={label}>{g.name}</legend>
                 <div className="flex flex-wrap gap-2">
-                  {g.choices.map((c) => (
+                  {g.choices.map((c) => {
+                    const on = choiceOn(c); // switched off in the dashboard's Inventory: shown, not pickable
+                    const extra = on && choicePrice(item, c);
+                    return (
                     <label
                       key={c.label}
-                      className="cursor-pointer rounded-full border-2 border-espresso/15 px-4 py-2 text-sm font-semibold transition-colors duration-150 hover:border-teal has-checked:border-teal-deep has-checked:bg-teal-deep has-checked:text-cream has-focus-visible:ring-2 has-focus-visible:ring-teal"
+                      className="cursor-pointer rounded-full has-disabled:cursor-not-allowed has-disabled:opacity-45 border-2 border-espresso/15 px-4 py-2 text-sm font-semibold transition-colors duration-150 hover:border-teal has-checked:border-teal-deep has-checked:bg-teal-deep has-checked:text-cream has-focus-visible:ring-2 has-focus-visible:ring-teal"
                     >
                       <input
                         type="radio"
                         name={g.name}
                         className="sr-only"
                         checked={choices[gi] === c.label}
+                        disabled={!on}
                         onChange={() => setChoices((cs) => cs.map((x, i) => (i === gi ? c.label : x)))}
                       />
                       {c.label}
-                      {c.price ? <span className="opacity-75"> +₱{c.price}</span> : null}
+                      {extra ? <span className="opacity-75"> +₱{extra}</span> : null}
+                      {!on && <span className="font-normal"> · sold out</span>}
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </fieldset>
             ))}
@@ -217,7 +223,7 @@ export function CartDrawer({ open, onClose }) {
   const lead = leadFor(lines);
   const slot = liveSlot(form.day, form.time, Date.now(), lead);
   const todayOpen = timeSlots(0, Date.now(), lead).length > 0;
-  const slow = lines.map((l) => describeLine(l).item).find((i) => i.leadMinutes);
+  const slow = lines.map((l) => describeLine(l)?.item).find((i) => i?.leadMinutes);
 
   useEffect(() => {
     if (open) ref.current.showModal();
@@ -270,6 +276,7 @@ export function CartDrawer({ open, onClose }) {
               <ul className="divide-y divide-dashed divide-espresso/20">
                 {lines.map((l) => {
                   const d = describeLine(l);
+                  if (!d) return null; // taken off the menu; pruneCart() drops it
                   return (
                     <li key={l.key} className="flex items-center gap-3 py-3">
                       {d.item.img ? (

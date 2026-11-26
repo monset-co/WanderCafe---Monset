@@ -1,6 +1,6 @@
 // Run with `npm run check`. Fails loudly if order pricing or validation breaks.
 import assert from "node:assert/strict";
-import { checkOrder, describeLine, fmtTime, liveSlot, timeSlots } from "./order.js";
+import { checkOrder, defaultChoices, describeLine, findItem, fmtTime, liveSlot, setLiveMenu, timeSlots } from "./order.js";
 
 // 9:00 AM in Manila
 const now = Date.parse("2026-11-02T01:00:00Z");
@@ -51,4 +51,23 @@ const pata = { ...ok, lines: [{ itemId: "crispy-pata", choices: ["Group meal, go
 assert.match(checkOrder({ ...pata, time: "09:30" }, now).error, /time/);
 assert.equal(checkOrder({ ...pata, time: "09:45" }, now).total, 79900);
 assert.equal(liveSlot(0, "09:30", now, 45).time, "09:45");
+// POS codes: a choice can be its own product (ulam, group meal) or an add-on on top
+assert.deepEqual(
+  [describeLine({ itemId: "filipino-plate", choices: ["Tocino"] }).code, describeLine({ itemId: "ramen", choices: ["Spicy", "Add cheese slice"] }).extras],
+  ["FP02", ["AD02"]]
+);
+// live Inventory prices win; inactive or missing products can't be ordered; defaults skip sold-out choices
+setLiveMenu([
+  { code: "CF04", price: 140, active: true },
+  { code: "FP01", price: 195, active: false },
+  { code: "FP02", price: 200, active: true },
+  { code: "CC03", price: 120, active: true },
+  { code: "AD02", price: 25, active: true },
+]);
+assert.equal(describeLine({ itemId: "coffee-latte", choices: [] }).unit, 140);
+assert.equal(describeLine({ itemId: "filipino-plate", choices: ["Corned Beef"] }), null);
+assert.deepEqual(defaultChoices(findItem("filipino-plate")), ["Tocino"]);
+assert.equal(describeLine({ itemId: "ramen", choices: ["Spicy", "Add cheese slice"] }).unit, 145);
+assert.equal(describeLine({ itemId: "coffee-espresso", choices: [] }), null); // not in Inventory
+assert.equal(checkOrder({ ...ok, lines: [{ itemId: "coffee-latte", choices: [], qty: 2 }] }, now).total, 28000);
 console.log("order checks passed");

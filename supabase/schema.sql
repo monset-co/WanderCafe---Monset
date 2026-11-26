@@ -1,3 +1,7 @@
+-- OBSOLETE: do NOT run this. The website now uses the dashboard's Supabase project, whose schema lives in
+-- WanderCafeDashboard-Monset/supabase/schema.sql (it already creates `orders` and `bookings`).
+-- The only SQL the website needs there is supabase/dashboard-new-items.sql. Kept for reference; safe to delete.
+
 -- Wander Cafe + B&B: run once in Supabase > SQL Editor.
 -- Money is stored in centavos (integers), like PayMongo.
 

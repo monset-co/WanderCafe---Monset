@@ -49,12 +49,17 @@ export const setQty = (key, qty) =>
 
 export const clearCart = () => save([]);
 
+// after the live menu loads: drop lines whose item (or choice) was taken off the menu in the dashboard
+export const pruneCart = () => lines.some((l) => !describeLine(l)) && save(lines.filter((l) => describeLine(l)));
+
 // total in centavos and item count, for the cart pill and drawer
 export function cartSummary(list) {
   let total = 0;
   let count = 0;
   for (const l of list) {
-    total += describeLine(l).unit * l.qty * 100;
+    const d = describeLine(l);
+    if (!d) continue; // went off the menu; pruneCart() removes it
+    total += d.unit * l.qty * 100;
     count += l.qty;
   }
   return { total, count };

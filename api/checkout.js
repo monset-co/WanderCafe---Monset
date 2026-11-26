@@ -1,33 +1,38 @@
 import { randomBytes } from "node:crypto";
 import { checkBooking, peso } from "../src/lib/booking.js";
-import { checkOrder, fmtTime } from "../src/lib/order.js";
-import { db, hasDb, holdCutoff, json } from "./_db.js";
+import { checkOrder, fmtTime, setLiveMenu } from "../src/lib/order.js";
+import { db, hasDb, holdCutoff, json, loadMenu } from "./_db.js";
 
 // POST /api/checkout  (Vercel function; vite.config.js runs it under `npm run dev` too)
 // Two kinds of payment, both on PayMongo's hosted page (GCash, Maya, card, QR Ph):
 //   { type: "order", ... }  cafe order, paid in full     -> back to /order?order=paid
-//   { ...booking }          B&B stay, 50% deposit       -> back to /stay?booking=paid
+//   { ...booking }          B&B stay, 50% deposit       -> off for now (BOOKINGS_ONLINE), the site is ordering only
 // The request is validated and priced here with the same code the page uses; the browser's
 // numbers are never trusted. The order/booking is saved as "pending" first; the PayMongo webhook
 // (api/paymongo-webhook.js) marks it paid. A pending booking holds its dates for HOLD_MINUTES, and
 // the database itself refuses overlapping bookings (supabase/schema.sql).
+const BOOKINGS_ONLINE = false;
+
 export async function POST(request) {
   const key = process.env.PAYMONGO_SECRET_KEY;
-  if (!key) return json({ error: "Online payment isn't set up yet. Please message us instead." }, 503);
+  if (!key || !hasDb()) return json({ error: "Online payment isn't set up yet. Please message us instead." }, 503);
 
   const input = await request.json().catch(() => null);
+  if (input?.type !== "order" && !BOOKINGS_ONLINE) return json({ error: "Online room booking isn't open yet. Please message us." }, 404);
+  if (input?.type === "order") {
+    // charge today's Inventory prices, never the page's (or menu.js's) numbers
+    const menu = await loadMenu();
+    if (!menu) return json({ error: "We couldn't load today's menu. Please try again in a moment." }, 503);
+    setLiveMenu(menu);
+  }
   const site = process.env.SITE_URL || new URL(request.url).origin;
   // unguessable, since /api/status answers by ref
   const ref = (prefix) => `${prefix}-${Date.now().toString(36)}${randomBytes(4).toString("hex")}`.toUpperCase();
   const session = input?.type === "order" ? orderSession(input, site, ref("WDO")) : bookingSession(input, site, ref("WDR"));
   if (session.error) return json({ error: session.error }, 400);
 
-  if (hasDb()) {
-    const saved = await session.save();
-    if (saved.error) return json({ error: saved.error }, saved.status);
-  } else {
-    console.warn("SUPABASE_* not set: this payment won't be recorded or protected against double-booking");
-  }
+  const saved = await session.save();
+  if (saved.error) return json({ error: saved.error }, saved.status);
 
   const r = await fetch("https://api.paymongo.com/v1/checkout_sessions", {
     method: "POST",
@@ -52,7 +57,7 @@ export async function POST(request) {
   if (!r.ok) {
     console.error("PayMongo checkout failed", r.status, JSON.stringify(body.errors ?? body));
     // let the dates go again; the guest never reached the payment page
-    if (hasDb()) await db(`${session.table}?ref=eq.${session.ref}`, { method: "PATCH", body: { status: "cancelled" } });
+    await db(`${session.table}?ref=eq.${session.ref}`, { method: "PATCH", body: { status: "cancelled" } });
     return json({ error: "We couldn't open the payment page. Please try again in a moment." }, 502);
   }
   return json({ url: body.data.attributes.checkout_url, ref: session.ref });
@@ -72,7 +77,8 @@ function orderSession(input, site, ref) {
         body: {
           ref, total, mode: o.mode, ready_date: o.date, ready_time: o.time,
           name: o.name, email: o.email, phone: o.phone, notes: o.notes,
-          items: lines.map((l) => ({ label: l.label, unit: l.unit, qty: l.qty })),
+          // the dashboard's record_web_order turns these POS codes into a register sale on the order board
+          items: lines.map((l) => ({ code: l.code, label: l.label, unit: l.unit, qty: l.qty, extras: l.extras })),
         },
       });
       return r.ok ? {} : { error: "We couldn't save your order. Please try again.", status: 500 };
