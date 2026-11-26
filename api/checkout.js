@@ -10,7 +10,7 @@ import { db, hasDb, holdCutoff, json, loadMenu } from "./_db.js";
 // The request is validated and priced here with the same code the page uses; the browser's
 // numbers are never trusted. The order/booking is saved as "pending" first; the PayMongo webhook
 // (api/paymongo-webhook.js) marks it paid. A pending booking holds its dates for HOLD_MINUTES, and
-// the database itself refuses overlapping bookings (supabase/schema.sql).
+// the database itself refuses overlapping bookings (the dashboard's supabase/schema.sql).
 const BOOKINGS_ONLINE = false;
 
 export async function POST(request) {

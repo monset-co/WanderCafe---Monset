@@ -36,7 +36,7 @@ npm run check                # money, validation and webhook-signature checks
 
 ## Go live (Cloudflare)
 
-1. **Inventory:** in the dashboard's Supabase › SQL Editor, run `supabase/dashboard-new-items.sql` once (the What's New items). Do **not** run `supabase/schema.sql`; it's obsolete.
+1. **Inventory:** in the dashboard's Supabase › SQL Editor, run `supabase/dashboard-new-items.sql` once (the What's New items).
 2. **Worker:** `npx wrangler login`, then `npm run deploy`. Or connect the GitHub repo in Cloudflare › Workers & Pages (build command `npm run build`, deploy command `npx wrangler deploy`).
 3. **Secrets:** Cloudflare › Workers › wandercafe-monset › Settings › Variables and Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (same as the dashboard Worker's), `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET`, and `SITE_URL` once the domain is set.
 4. **Domain:** Settings › Domains & Routes › add the custom domain.
